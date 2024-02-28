@@ -70,18 +70,19 @@ bool do_exec(int count, ...)
 
     pid_t pid = fork();
     if (pid == -1) {
-        // Error al hacer fork
         va_end(args);
-        return false;
+        return false; // Fallo en fork
     } else if (pid == 0) {
         // Proceso hijo
-        if (execv(command[0], command) == -1) {
-            exit(EXIT_FAILURE); // Si execv falla, termina el proceso hijo
-        }
+        execv(command[0], command);
+        exit(EXIT_FAILURE); // Si execv falla
     } else {
         // Proceso padre
         int status;
-        waitpid(pid, &status, 0);
+        if (waitpid(pid, &status, 0) == -1) {
+            va_end(args);
+            return false; // Fallo en waitpid
+        }
         va_end(args);
         return WIFEXITED(status) && WEXITSTATUS(status) == 0;
     }
@@ -116,10 +117,10 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    int out = open(outputfile, O_RDWR|O_CREAT|O_APPEND, 0600);
+    int out = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
     if (out == -1) {
         va_end(args);
-        return false;
+        return false; // Fallo en abrir el archivo
     }
 
     pid_t pid = fork();
@@ -130,16 +131,22 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         return false;
     } else if (pid == 0) {
         // Proceso hijo
-        dup2(out, STDOUT_FILENO); // Redirecciona stdout al archivo
-        close(out);
-        if (execv(command[0], command) == -1) {
-            exit(EXIT_FAILURE); // Si execv falla, termina el proceso hijo
+        if (dup2(out, STDOUT_FILENO) < 0) {
+            perror("dup2");
+            close(out);
+            exit(EXIT_FAILURE); // Si dup2 falla
         }
+        close(out);
+        execv(command[0], command);
+        exit(EXIT_FAILURE); // Si execv falla
     } else {
         // Proceso padre
         close(out);
         int status;
-        waitpid(pid, &status, 0);
+        if (waitpid(pid, &status, 0) == -1) {
+            va_end(args);
+            return false; // Fallo en waitpid
+        }
         va_end(args);
         return WIFEXITED(status) && WEXITSTATUS(status) == 0;
     }
