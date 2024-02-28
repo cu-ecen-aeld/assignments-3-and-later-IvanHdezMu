@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h> // Para system()
+#include <unistd.h> // Para execv(), fork(), close(), dup2()
+#include <sys/wait.h> // Para wait()
+#include <stdarg.h> // Para va_list
+#include <fcntl.h> // Para open()
+
+
 
 /**
  * @param cmd the command to execute with system()
@@ -17,7 +24,9 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int status;
+    status = system(cmd);
+    return status == 0;
 }
 
 /**
@@ -47,7 +56,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 /*
  * TODO:
@@ -59,9 +68,23 @@ bool do_exec(int count, ...)
  *
 */
 
-    va_end(args);
-
-    return true;
+    pid_t pid = fork();
+    if (pid == -1) {
+        // Error al hacer fork
+        va_end(args);
+        return false;
+    } else if (pid == 0) {
+        // Proceso hijo
+        if (execv(command[0], command) == -1) {
+            exit(EXIT_FAILURE); // Si execv falla, termina el proceso hijo
+        }
+    } else {
+        // Proceso padre
+        int status;
+        waitpid(pid, &status, 0);
+        va_end(args);
+        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
 }
 
 /**
@@ -82,7 +105,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 
 /*
@@ -93,7 +116,31 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    va_end(args);
+    int out = open(outputfile, O_RDWR|O_CREAT|O_APPEND, 0600);
+    if (out == -1) {
+        va_end(args);
+        return false;
+    }
 
-    return true;
+    pid_t pid = fork();
+    if (pid == -1) {
+        // Error al hacer fork
+        close(out);
+        va_end(args);
+        return false;
+    } else if (pid == 0) {
+        // Proceso hijo
+        dup2(out, STDOUT_FILENO); // Redirecciona stdout al archivo
+        close(out);
+        if (execv(command[0], command) == -1) {
+            exit(EXIT_FAILURE); // Si execv falla, termina el proceso hijo
+        }
+    } else {
+        // Proceso padre
+        close(out);
+        int status;
+        waitpid(pid, &status, 0);
+        va_end(args);
+        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
 }
