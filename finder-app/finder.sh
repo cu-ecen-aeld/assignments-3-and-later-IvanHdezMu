@@ -29,5 +29,5 @@ while IFS= read -r file; do
 done < <(find "$filesdir" -type f)
 
 # Imprimir el resultado
-echo "The number of files are $file_count  and the number of matching lines are $line_count"
+echo "The number of files are $file_count and the number of matching lines are $line_count"
 
