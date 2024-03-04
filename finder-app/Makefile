@@ -3,8 +3,8 @@ CC=gcc
 # Si CROSS_COMPILE está definido, se prependerá a la llamada del compilador
 ARCH=$(CROSS_COMPILE)$(CC)
 
-# El objetivo por defecto que se ejecutará si solo escribes 'make' en la terminal
-default: writer
+# Objetivos que este Makefile puede construir
+all: writer
 
 # Regla para compilar el ejecutable 'writer' a partir de los archivos objeto
 writer: writer.o
