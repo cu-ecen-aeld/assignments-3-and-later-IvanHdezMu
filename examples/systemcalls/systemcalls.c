@@ -1,11 +1,10 @@
 #include "systemcalls.h"
-#include <stdlib.h> // Para system()
-#include <unistd.h> // Para execv(), fork(), close(), dup2()
-#include <sys/wait.h> // Para wait()
-#include <stdarg.h> // Para va_list
-#include <fcntl.h> // Para open()
-
-
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -23,10 +22,21 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+	int status;
+	status = system(cmd);
+//Check if the system call is successful and return false on failure
+	if ((status == -1))
+	{
+		return false;
+	}
+//Check exit status of the cmd and return false on failure
+	if (!WIFEXITED(status))
+	{
+		return false;
+	}
 
-    int status;
-    status = system(cmd);
-    return status == 0;
+
+    return true;
 }
 
 /**
@@ -56,7 +66,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    //command[count] = command[count];
+    command[count] = command[count];
 
 /*
  * TODO:
@@ -67,25 +77,44 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid;
+    int status;
 
-    pid_t pid = fork();
-    if (pid == -1) {
-        va_end(args);
-        return false; // Fallo en fork
-    } else if (pid == 0) {
-        // Proceso hijo
-        execv(command[0], command);
-        exit(EXIT_FAILURE); // Si execv falla
-    } else {
-        // Proceso padre
-        int status;
-        if (waitpid(pid, &status, 0) == -1) {
-            va_end(args);
-            return false; // Fallo en waitpid
-        }
-        va_end(args);
-        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    pid = fork();
+//check the fork return status and return false on failure
+    if (pid == -1)
+    {
+	    return false;
     }
+//check for child process and exec in the child instance with the input command
+    else if (pid == 0)
+    {
+	    execv(command[0], command);
+	    exit(1);
+    }
+//waits for child process to exit and returns false on failure
+    if (waitpid(pid, &status, 0) == -1)
+    {
+	    perror("wait PID");
+	    return false;
+    }
+//check if the child has exited normally and return false if not
+    else if (!(WIFEXITED(status)))
+    {
+	    return false;
+    }
+//check for the status after the child process has exited normally
+    else
+    {
+	    if(WEXITSTATUS(status))
+	    {
+		    return false;
+	    }
+    }
+
+    va_end(args);
+
+    return true;
 }
 
 /**
@@ -106,7 +135,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    //command[count] = command[count];
+    command[count] = command[count];
 
 
 /*
@@ -117,37 +146,50 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    int out = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    if (out == -1) {
-        va_end(args);
-        return false; // Fallo en abrir el archivo
+    int status;
+    pid_t pid;
+
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+//Open a output file to redirect the messages
+    if (fd == -1)
+    {
+	    perror("OPEN");
+	    return false;
+    }
+//Create a child process and assign a new file descriptor for the output file in the child process
+    switch (pid = fork())
+    {
+	    case 0: if (dup2(fd, 1) < 0)
+		    {
+			    perror("DUP2");
+			    return false;
+		    }
+		    close(fd);
+		    execv(command[0], command);
+		    exit(1);
+            case -1: perror("FORK");
+                     return false;
+	    default: close(fd);
+    }
+//Wait on the child process to exit and return the corresponding status
+    if (waitpid(pid, &status, 0) == -1)
+    {
+            perror("wait PID");
+            return false;
+    }
+    else if (!(WIFEXITED(status)))
+    {
+            return false;
+    }
+    else
+    {
+            if(WEXITSTATUS(status))
+            {
+                    return false;
+            }
     }
 
-    pid_t pid = fork();
-    if (pid == -1) {
-        // Error al hacer fork
-        close(out);
-        va_end(args);
-        return false;
-    } else if (pid == 0) {
-        // Proceso hijo
-        if (dup2(out, STDOUT_FILENO) < 0) {
-            perror("dup2");
-            close(out);
-            exit(EXIT_FAILURE); // Si dup2 falla
-        }
-        close(out);
-        execv(command[0], command);
-        exit(EXIT_FAILURE); // Si execv falla
-    } else {
-        // Proceso padre
-        close(out);
-        int status;
-        if (waitpid(pid, &status, 0) == -1) {
-            va_end(args);
-            return false; // Fallo en waitpid
-        }
-        va_end(args);
-        return WIFEXITED(status) && WEXITSTATUS(status) == 0;
-    }
+    va_end(args);
+
+    return true;
 }

@@ -1,33 +1,25 @@
-#!/bin/bash
+#!/bin/sh
+# Author: Sai Charan Mandadi
+# Description: Finds the required string in the given input directories and prints the count of total
+#number of files and matched lines.
 
-# Asignar los argumentos de entrada a variables
-filesdir=$1
-searchstr=$2
-
-# Verificar si ambos argumentos fueron proporcionados
-if [ -z "$filesdir" ] || [ -z "$searchstr" ]; then
-    echo "Error: Se requieren dos argumentos: un directorio y una cadena de búsqueda."
-    exit 1
+#Check if the arguments are valid number of arguments
+if [ $# -ne 2 ];
+then
+	echo "ERROR: Invalid number of arguments"
+	echo "Total number of arguments: 2. usage: finder.sh <files dir> <search string>"
+	exit 1
+else
+#Checks if the input file directory exists and then extracts the total files and matched lines with the input string.
+	if [ -d "$1" ];
+	then
+		TOTAL_FILES=$(find $1 -type f | wc -l)
+		MATCHED_LINES=$(grep -r $2 $1 | wc -l)
+		echo "The number of files are ${TOTAL_FILES} and the number of matching lines are ${MATCHED_LINES}"
+		exit 0
+#Handles the condition where the input file directory is not present.
+	else
+		echo "Input File directory does not exits"
+		exit 1
+	fi
 fi
-
-# Verificar si el primer argumento es un directorio
-if [ ! -d "$filesdir" ]; then
-    echo "Error: El directorio especificado no existe."
-    exit 1
-fi
-
-# Buscar archivos y cuenta líneas coincidentes
-file_count=0
-line_count=0
-
-# Encuentrar y procesar cada archivo en el directorio y subdirectorios
-while IFS= read -r file; do
-    file_count=$((file_count + 1)) # Incrementa el contador de archivos
-    # Contar las líneas que coinciden con la cadena de búsqueda en el archivo actual
-    lc=$(grep -c "$searchstr" "$file")
-    line_count=$((line_count + lc)) # Sumar al contador total de líneas
-done < <(find "$filesdir" -type f)
-
-# Imprimir el resultado
-echo "The number of files are $file_count and the number of matching lines are $line_count"
-

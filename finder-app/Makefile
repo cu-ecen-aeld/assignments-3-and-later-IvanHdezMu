@@ -1,25 +1,13 @@
-# Definición del compilador por defecto
 CC=gcc
-# Si CROSS_COMPILE está definido, se prependerá a la llamada del compilador
-ARCH=$(CROSS_COMPILE)$(CC)
+CFLAGS=-Wall -Werror
 
+all : writer
 
-srcs = writer.c
-objs = $(srcs:.c=.o)
+writer : writer.o
+	$(CROSS_COMPILE)$(CC) $(CFLAGS) writer.o -o writer
 
-.PHONY: all
-all: writer
+writer.o : writer.c
+	$(CROSS_COMPILE)$(CC) $(CFLAGS) -c writer.c -o writer.o
 
-.PHONY: clean
-clean:
-	rm -f writer *.o
-
-$(objs): %.o: %.c
-	#$(CROSS_COMPILE)gcc -c $<
-	$(ARCH) $^ -o $@
-
-
-writer: $(objs)
-	#$(CROSS_COMPILE)gcc -o $@ $?
-	$(ARCH) $^ -o $@
-
+clean :
+	rm -rf *.o writer
