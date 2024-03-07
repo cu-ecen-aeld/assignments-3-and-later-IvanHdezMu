@@ -1,32 +1,40 @@
 #!/bin/bash
+#Author: Sai Charan Mandadi
+#Description: A simple writer script that takes file path and string to be inserted into the file.
+#creates the the file directory if the input path is not present.
 
-# Asigna los argumentos de entrada a variables
-writefile=$1
-writestr=$2
-
-# Verifica si ambos argumentos fueron proporcionados
-if [ -z "$writefile" ] || [ -z "$writestr" ]; then
-    echo "Error: Se requieren dos argumentos, una ruta de archivo y una cadena de texto."
-    exit 1
+#Checks for valid input arguments
+if [ "$#" -gt 0 ] && [ "$#" -lt 3 ];
+then
+	INPUTFILE="$1"
+	INPUTSTRING="$2"
+#If the file already exists insert the string into the file
+	if [ -f "$INPUTFILE" ];
+	then
+		echo $INPUTSTRING > $INPUTFILE
+#Create a file or directory if either of them is not present
+	else
+		if [ -d "$(dirname "$INPUTFILE")" ];
+		then
+			touch $INPUTFILE
+			echo $INPUTSTRING > $INPUTFILE
+		else
+			echo "Input file is not present, creating new file at $1"
+			mkdir -p "$(dirname "$INPUTFILE")"
+#checks if mkdir is able to execute without errors
+			if [ $? -ne 0 ];
+			then
+				echo "Unable to create input directory path"
+				exit 1
+			else
+#Insert the input string into the newly created file
+				touch $INPUTFILE
+				echo $INPUTSTRING > $INPUTFILE
+			fi
+		fi
+	fi
+#Handles Invalid number of arguments
+else
+	echo "Please provide valid arguments"
+	exit 1;
 fi
-
-# Intenta crear los directorios si no existen
-dir_path=$(dirname "$writefile")
-mkdir -p "$dir_path"
-
-# Verifica si el directorio se creó correctamente
-if [ ! -d "$dir_path" ]; then
-    echo "Error: No se pudo crear el directorio para el archivo."
-    exit 1
-fi
-
-# Intenta escribir la cadena en el archivo, creando o sobrescribiendo el archivo
-echo "$writestr" > "$writefile"
-
-# Verifica si el archivo se creó y escribió correctamente
-if [ $? -ne 0 ]; then
-    echo "Error: No se pudo escribir en el archivo."
-    exit 1
-fi
-
-echo "Archivo creado y escrito exitosamente."

@@ -1,45 +1,114 @@
+/***************************************************************************************************************
+File Name	: writer.c
+Description	: This file contains code to insert string into a file.
+Author		: Sai Charan Mandadi
+****************************************************************************************************************/
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
-int main(int argc, char *argv[]) {
-    // Inicializa el logging de syslog.
-    openlog("writer", LOG_PID|LOG_CONS, LOG_USER);
-    
-    // Verifica que se hayan proporcionado los argumentos correctos.
-    if (argc != 3) {
-        syslog(LOG_ERR, "Error: Se requieren exactamente dos argumentos, una ruta de archivo y una cadena de texto.");
-        fprintf(stderr, "Uso: %s <ruta_de_archivo> <cadena_de_texto>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
+#define ARGS_COUNT 3
+#define NULL_VAL -1
 
-    char *writefile = argv[1];
-    char *writestr = argv[2];
+/***************************************************************************************************************
+Description	: display_usage_info()
+Prints the information about usage of applications and its arguments
+Return type	: Void
+Arguments	: Void
+****************************************************************************************************************/
+void display_usage_info(void)
+{
+	printf("USAGE: ./writer <Path to File> <String>\n");
+}
 
-    // Registra el intento de escritura.
-    syslog(LOG_DEBUG, "Escribiendo '%s' en '%s'", writestr, writefile);
+/***************************************************************************************************************
+Description     : open_file(const char*)
+Function used to open a file by taking file path as its argument and returns file descriptor.
+Return type     : int
+Arguments       : const char*
+****************************************************************************************************************/
+int open_file(const char* file_path)
+{
+	int fd = open(file_path, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP | S_IROTH);
 
-    FILE *file = fopen(writefile, "w");
-    if (file == NULL) {
-        syslog(LOG_ERR, "Error: No se pudo abrir el archivo '%s' para escritura.", writefile);
-        exit(EXIT_FAILURE);
-    }
+	return fd;
+}
 
-    // Escribe la cadena en el archivo.
-    if (fputs(writestr, file) == EOF) {
-        syslog(LOG_ERR, "Error: No se pudo escribir en el archivo '%s'.", writefile);
-        fclose(file); // Asegura que el archivo se cierra correctamente.
-        exit(EXIT_FAILURE);
-    }
+/***************************************************************************************************************
+Description     : close_file(int)
+Function used to close a file by taking file descriptor as its argument.
+Return type     : void
+Arguments       : int
+****************************************************************************************************************/
+void close_file(int fd)
+{
+	close(fd);
+}
 
-    // Cierra el archivo y registra el éxito de la operación.
-    fclose(file);
-    syslog(LOG_INFO, "Archivo '%s' creado y escrito exitosamente.", writefile);
+/***************************************************************************************************************
+Description     : main(int, char*)
+This function is responsible for setting up syslog to log debug information and writes the input string into a file.
+Return type     : int
+Arguments       : (int, char*)
+****************************************************************************************************************/
+int main(int argc, char* argv[])
+{
+//Sets up sys log using name and modes
+	openlog("AESD_WRITER", LOG_PID, LOG_USER);
 
-    // Cierra el logging de syslog.
-    closelog();
+//Verifies if the argument count is valid
+	if (argc != ARGS_COUNT)
+	{
+		syslog(LOG_ERR, "Invalid number of arguments");
+		display_usage_info();
+		closelog();
+		return 1;
+	}
 
-    return 0;
+//Stores file path from the first argument
+	const char* file_path = argv[1];
+	ssize_t bytes_count;
+//Stores the input string from the second argument
+	char* ip_str = argv[2];
+	ssize_t ip_str_size = strlen(ip_str);
+
+//Open's the input file and verifies the return status
+	int fd = open_file(file_path);
+	if (fd == NULL_VAL)
+	{
+		syslog(LOG_ERR, "Unable to open the file %s \n\r", file_path);
+		closelog();
+		return 1;
+	}
+
+//Write and verify if the entire input stream has been succesfully written into the file
+	bytes_count = write(fd, ip_str, ip_str_size);
+
+	if ((bytes_count == NULL_VAL) || (bytes_count == 0))
+	{
+		syslog(LOG_ERR, "ERROR: %d writing into the file %s, Input String: %s \n\r", errno, file_path, ip_str);
+		close_file(fd);
+		closelog();
+		return 1;
+	}
+	else if (bytes_count != ip_str_size)
+	{
+		syslog(LOG_ERR, "ERROR: PARTIAL WRITE: %d writing into the file %s, Input String: %s \n\r", errno, file_path, ip_str);
+                close_file(fd);
+                closelog();
+                return 1;
+	}
+
+//Logs information after successful write
+	syslog(LOG_DEBUG, "Finished writing into the file %s, Input String: %s \n\r", file_path, ip_str);
+
+	close_file(fd);
+	closelog();
+
+	return 0;
 }
