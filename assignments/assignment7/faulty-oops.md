@@ -56,18 +56,26 @@ Call trace:
 Code: d2800001 d2800000 d503233f d50323bf (b900003f) 
 ---[ end trace d4d22182746da4bd ]---
 ```
+
 ## Analysis:
+
 * Error Description:
 The error message indicates a kernel NULL pointer dereference at virtual address 0000000000000000, resulting in a kernel panic.
+
 * Memory Abort Info:
 Provides additional information about the abort, including the exception syndrome register (ESR) and exception class (EC). The fault status code (FSC) indicates a level 1 translation fault.
+
 * Data Abort Info:
 Provides more details about the data abort, including the instruction specific syndrome (ISS) and information about the fault, such as whether it was a read or write fault.
+
 * CPU and Process Information:
 Specifies the CPU and process information at the time of the error, including the process ID (PID) and the name of the command that triggered the error (sh).
+
 * Kernel Stack Trace:
 Shows the kernel stack trace leading up to the error, including the function names and addresses. The faulty_write function from the faulty module is identified as the source of the error, along with other related functions such as vfs_write and syscall-related functions.
+
 * Call Trace:
 Provides a backtrace of function calls leading up to the error, helping to identify the sequence of function calls that led to the issue.
+
 * Code Dump:
 Displays a dump of the kernel code at the point of the error, which can provide additional context for debugging purposes.
