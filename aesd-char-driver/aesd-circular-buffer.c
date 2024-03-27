@@ -29,51 +29,46 @@
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
             size_t char_offset, size_t *entry_offset_byte_rtn )
 {
-    size_t bytes_traversed = 0;
-    uint8_t traverse_len = 0;
-
-    if ((buffer != NULL) || (entry_offset_byte_rtn != NULL))
-    {
-    	int pos = buffer->out_offs;
-    	if (buffer->full)
-    	{
-    		traverse_len = AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    	}
-    	else
-    	{
-    		if (buffer->in_offs > buffer->out_offs)
-    		{
-    			traverse_len = (buffer->in_offs - buffer->out_offs);
-    		}
-    		else
-    		{
-    			traverse_len = AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - (buffer->out_offs - buffer->in_offs);
-    		}
-    		
-    	}
-	while (traverse_len > 0)
-	{
-    		if ((char_offset >= 0) && ((bytes_traversed + buffer->entry[pos].size) > char_offset))
-    		{
-    			*entry_offset_byte_rtn = (char_offset - bytes_traversed);
-    			return &buffer->entry[pos];
-    		}
-    		
-    		bytes_traversed += buffer->entry[pos].size;
-
-    		if (pos == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED-1)
-    		{
-    			pos = 0;
-    		}
-    		else
-    		{
-    			pos++;	
-    		}
-    		traverse_len--;
-	}
+    //check empty
+    if((buffer->in_offs == buffer->out_offs) && !buffer->full) {
+    	return NULL;    
     }
     
-    return NULL;
+    //find out which entry the char is in
+    size_t total_s = 0;
+    uint8_t i = buffer->out_offs; //go from out_offs to in_offs
+    uint8_t s = buffer->in_offs;
+    struct aesd_buffer_entry *entry;
+    bool isDone = false;
+    //need do-while for full (offsets equal)
+    do {
+    	//set entry
+    	entry = &(buffer->entry[i]);
+        
+        total_s = total_s + entry->size;
+        //check if char_offset is in this entry
+        if(total_s > char_offset) {
+            isDone = true;
+            break; //leave loop with entry, index, and total_s
+        }
+        
+        //handle wrap-around
+        if(i == (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1))
+            i = 0;
+        else 
+            i++;
+    } while( i != s);
+    
+    //check for failure
+    if(!isDone)
+        return NULL;
+    
+    //set the byte_rtn value from "modulus"
+    size_t byte_rtn_i = entry->size - (total_s - char_offset);
+    *entry_offset_byte_rtn = byte_rtn_i;
+    
+    //set the return struct
+    return entry;
 }
 
 /**
@@ -83,50 +78,34 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-const char* aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    if ((buffer == NULL) || (add_entry == NULL))
-    {
-    	return NULL;
+    //set the add_entry to the in offset
+    uint8_t in_temp = buffer->in_offs;
+    uint8_t out_temp = buffer->out_offs;
+    buffer->entry[in_temp] = *add_entry;
+    
+    if(buffer->full) {
+        out_temp = out_temp + 1;
     }
     
-    const char* freeptr = NULL;
-
-    if (buffer->full)
-    {
-    	freeptr = buffer->entry[buffer->in_offs].buffptr;
-    	if (buffer->in_offs >= (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED -1) )
-    	{
-    		//buffer->in_offs=0;
-    		buffer->out_offs=0;
-    	}
-    	else
-    	{
-    		buffer->out_offs += 1;
-    	}
-    }
+    //increase the in offset
+    in_temp = in_temp + 1;
     
-    buffer->entry[buffer->in_offs] = *add_entry;
+    //ensure in wraps back around
+    if(in_temp >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+        in_temp = 0;
     
-    if (buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)
-    {
-    	buffer->in_offs=0;
-    }
-    else
-    {
-    	buffer->in_offs += 1;
-    }
+    if(out_temp >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+        out_temp = 0;
     
-    if (buffer->in_offs == buffer->out_offs)
-    {
-    	buffer->full = true;
-    }
-    else
-    {
-    	buffer->full = false;
-    }
-    
-    return freeptr;
+    //determine if full
+    if(in_temp == out_temp)
+        buffer->full = true;
+        
+    //set the offsets
+    buffer->in_offs = in_temp;
+    buffer->out_offs = out_temp;
 }
 
 /**

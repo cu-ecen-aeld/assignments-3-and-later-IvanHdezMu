@@ -1,17 +1,15 @@
-CC ?= $(CROSS_COMPILE)gcc
-
+CC ?= $(CROSS_COMPILER)gcc
 CFLAGS ?= -g -Wall -Werror
 LDFLAGS ?= -pthread -lrt
-
-default : aesdsocket
+TARGET ?= aesdsocket
 
 all: aesdsocket
 
-aesdsocket : aesdsocket.o
-	$(CC) $(CFLAGS) $(LDFLAGS) aesdsocket.o -o aesdsocket
-
-aesdsocket.o: aesdsocket.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -c aesdsocket.c
-
-clean:
-	-rm -f *.o aesdsocket
+aesdsocket: aesdsocket.c aesdsocket.h queue.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) aesdsocket.c
+	
+test: ioctl_test.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o ioctlTest ioctl_test.c
+    
+clean: 
+	rm -rf *.o *stackdump aesdsocket ioctlTest
