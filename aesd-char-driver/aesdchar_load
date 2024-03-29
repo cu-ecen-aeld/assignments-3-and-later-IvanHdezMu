@@ -2,6 +2,9 @@
 module=aesdchar
 device=aesdchar
 mode="664"
+
+KERNEL_MOD_PATH=/lib/modules/5.15.18/extra/
+
 cd `dirname $0`
 set -e
 # Group: since distributions do it differently, look for wheel or use staff
@@ -11,9 +14,9 @@ else
     group="wheel"
 fi
 
-if [ -e ${module}.ko ]; then
+if [ -e ${KERNEL_MOD_PATH}$module.ko ]; then
     echo "Loading local built file ${module}.ko"
-    insmod ./$module.ko $* || exit 1
+    insmod ${KERNEL_MOD_PATH}$module.ko $* || exit 1
 else
     echo "Local file ${module}.ko not found, attempting to modprobe"
     modprobe ${module} || exit 1
